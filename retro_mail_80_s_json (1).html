@@ -1,0 +1,186 @@
+# RETRO MAIL 1986 (Proyecto completo)
+
+## 📁 1. server.js
+```js
+const express = require("express");
+const fs = require("fs");
+
+const app = express();
+app.use(express.json());
+app.use(express.static("."));
+
+function leerDB() {
+  return JSON.parse(fs.readFileSync("db.json"));
+}
+
+function guardarDB(data) {
+  fs.writeFileSync("db.json", JSON.stringify(data, null, 2));
+}
+
+app.post("/registro", (req, res) => {
+  const { usuario, password } = req.body;
+  const db = leerDB();
+
+  if (db.usuarios.find(u => u.usuario === usuario)) {
+    return res.send("Usuario ya existe");
+  }
+
+  db.usuarios.push({
+    usuario,
+    password,
+    bandeja: [],
+    enviados: []
+  });
+
+  guardarDB(db);
+  res.send("Usuario creado");
+});
+
+app.post("/login", (req, res) => {
+  const { usuario, password } = req.body;
+  const db = leerDB();
+
+  const user = db.usuarios.find(
+    u => u.usuario === usuario && u.password === password
+  );
+
+  if (!user) return res.send("Error");
+
+  res.json(user.bandeja);
+});
+
+app.post("/enviar", (req, res) => {
+  const { de, para, mensaje } = req.body;
+  const db = leerDB();
+
+  const receptor = db.usuarios.find(u => u.usuario === para);
+  if (!receptor) return res.send("No existe usuario");
+
+  const correo = {
+    de,
+    mensaje,
+    fecha: new Date().toLocaleString()
+  };
+
+  receptor.bandeja.push(correo);
+
+  const emisor = db.usuarios.find(u => u.usuario === de);
+  if (emisor) emisor.enviados.push(correo);
+
+  guardarDB(db);
+  res.send("Enviado");
+});
+
+app.listen(3000, () => console.log("http://localhost:3000"));
+```
+
+---
+
+## 📁 2. db.json
+```json
+{
+  "usuarios": []
+}
+```
+
+---
+
+## 📁 3. index.html
+```html
+<!DOCTYPE html>
+<html>
+<body style="background:black;color:#00ff00;font-family:monospace">
+<h2>RETRO MAIL SYSTEM 1986</h2>
+
+USER: <input id="user"><br>
+PASS: <input id="pass" type="password"><br><br>
+
+<button onclick="registro()">REGISTRAR</button>
+<button onclick="login()">LOGIN</button>
+
+<hr>
+
+TO: <input id="to"><br>
+MSG: <input id="msg"><br>
+<button onclick="enviar()">ENVIAR</button>
+
+<pre id="out">READY.</pre>
+
+<script>
+async function registro(){
+  const res = await fetch("/registro",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({
+      usuario:user.value,
+      password:pass.value
+    })
+  });
+  out.textContent = await res.text();
+}
+
+async function login(){
+  const res = await fetch("/login",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({
+      usuario:user.value,
+      password:pass.value
+    })
+  });
+
+  const data = await res.json();
+  let txt = "INBOX:\n\n";
+
+  data.forEach(m=>{
+    txt += `FROM: ${m.de}\n${m.mensaje}\n\n`;
+  });
+
+  out.textContent = txt;
+}
+
+async function enviar(){
+  const res = await fetch("/enviar",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({
+      de:user.value,
+      para:to.value,
+      mensaje:msg.value
+    })
+  });
+
+  out.textContent = await res.text();
+}
+</script>
+</body>
+</html>
+```
+
+---
+
+## ▶️ Cómo usar
+1. Instala Node.js
+2. En la carpeta:
+```
+npm init -y
+npm install express
+node server.js
+```
+3. Abre:
+```
+http://localhost:3000
+```
+
+---
+
+## ✅ Qué ya hace
+- Registro de usuarios
+- Login
+- Envío de mensajes
+- Guardado en JSON (db.json)
+
+---
+
+## ⚠️ Nota
+Esto es educativo. No uses contraseñas reales aquí.
